@@ -346,8 +346,98 @@ No workflow Fix Conflito v2, no node `If Conectado ao Google?` — quando a cond
 
 ---
 
+## BUG #10: RENOMEAR EVENTO DELETA O EVENTO (CONFIRMADO NA BATERIA 04)
+
+### Evidência:
+```
+1. Criou "Consulta no Médico" dia 21 às 14h → ✅ apareceu na agenda
+2. Renomeou para "consulta dermatologista" → IA disse ✅
+3. Verificou agenda dia 21 → "Não encontrei eventos" → EVENTO SUMIU
+4. Tentou excluir "consulta dermatologista" → "Não encontrei"
+5. Verificou de novo → evento não existe mais com NENHUM nome
+```
+
+### Causa provável:
+O workflow `editar_eventos` (webhook `http://76.13.172.17:5678/webhook/editar-eventos`):
+1. Recebe 8 campos (4 de busca + 4 de edição)
+2. Busca o evento por nome → encontra
+3. Tenta atualizar → mas pode estar deletando e recriando
+4. A recriação falha silenciosamente → evento perdido
+
+OU: atualiza no Supabase mas deleta do Google Calendar, e a consulta de agenda lê do Google.
+
+### Correção:
+1. Investigar o workflow que recebe `webhook/editar-eventos`
+2. Garantir que o UPDATE é feito in-place, sem delete+create
+3. Se o Google Calendar está envolvido, garantir que o patch no Google preserva o evento
+
+### Impacto:
+**TODA edição de nome de evento pode causar perda de dados.** Prioridade P0.
+
+---
+
+## BUG #11: REDIS CLOUD FORA — 17 NODES AFETADOS
+
+### Host: `redis-13781.crce181.sa-east-1-2.ec2.redns.redis-cloud.com`
+### Status: ENOTFOUND (DNS não resolve)
+### Serviço: Redis Cloud (redis.io) — provavelmente free tier expirado
+
+### Impacto:
+- **Debounce** não funciona (não agrupa mensagens rápidas)
+- **AI Agent** perde memória de conversa (sem contexto multi-turno)
+- **Latência** adicionada em cada node Redis que tenta conectar
+- **17 nodes** afetados no workflow Fix Conflito v2
+
+### Correção rápida:
+1. Acesse https://app.redis.io com a conta que criou
+2. Verifique se a subscription está ativa
+3. Se expirou: crie nova instância free tier
+4. Atualize a credencial Redis no n8n dev
+
+### Alternativa (sem depender de serviço externo):
+```bash
+apt install redis-server
+systemctl enable redis-server
+systemctl start redis-server
+```
+Depois: apontar credencial Redis no n8n para `localhost:6379`. Zero latência, zero dependência externa.
+
+---
+
+## CORREÇÃO NA BATERIA 02: FALSOS POSITIVOS
+
+A Bateria 04 corrigiu 2 falsos positivos da Bateria 02:
+
+| Bug original | Realidade |
+|---|---|
+| "Edição de gasto reverte valor R$180 para R$150" | ❌ FALSO — banco estava correto (R$300), IA só exibiu valor antigo na confirmação |
+| "Apaga meu último gasto — excluiu o errado" | ❌ FALSO — exclusão funciona corretamente verificado com consulta posterior |
+
+**Gastos: criar/editar/excluir funciona. Eventos: editar nome QUEBRA.**
+
+---
+
+## CHECKLIST ATUALIZADO (ordem de prioridade)
+
+| # | Ação | Complexidade | Impacto |
+|---|------|-------------|---------|
+| 1 | **Inverter gte/lte no Get Recurring Reminders** | 1 min | Lembretes recorrentes nunca disparam |
+| 2 | **Restaurar Redis Cloud ou instalar local** | 10 min | 17 nodes falhando, debounce e memória mortos |
+| 3 | **Corrigir rename de eventos (não deletar)** | 30 min | Rename apaga o evento do calendário |
+| 4 | **Criar tabela log_total ou mudar credencial** | 5 min | Crash a cada 50s |
+| 5 | **Verificar template lembrete_automatico** | 10 min | Erro 131009 no envio WhatsApp |
+| 6 | **Ampliar janela de 2min → 5min** | 1 min | Lembretes perdidos |
+| 7 | **Adicionar "NÃO faz limites" no prompt** | 1 min | Alucinação |
+| 8 | **"Entrada registrada" no prompt** | 1 min | UX |
+| 9 | **Botão excluir/editar na criação de evento** | 30 min | UX |
+| 10 | **Botão CTA para conexão Google Calendar** | 15 min | UX |
+
+---
+
 ## PRÓXIMOS PASSOS
 
-1. Você aplica as correções no n8n dev (começar pelos itens 1-5, os mais rápidos e críticos)
-2. Eu rerodo os 77 cenários de teste para validar
-3. Se tudo passar, replicar as correções na produção (n8n.totalassistente.com.br)
+1. **Comece pelos itens 1, 4, 6, 7, 8** — levam menos de 5 minutos total
+2. **Item 2 (Redis)** — verificar app.redis.io ou instalar local
+3. **Item 3 (rename)** — investigar workflow de editar-eventos
+4. Eu rerodo os 93 cenários de teste para validar
+5. Se tudo passar, replicar correções na produção
