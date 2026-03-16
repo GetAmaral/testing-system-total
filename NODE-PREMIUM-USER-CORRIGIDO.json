@@ -1,0 +1,72 @@
+{
+  "parameters": {
+    "method": "POST",
+    "url": "https://totalassistente.com.br/webhook/12801cb9-3923-4517-bfbf-c24c54e613c2",
+    "authentication": "genericCredentialType",
+    "genericAuthType": "httpBasicAuth",
+    "sendBody": true,
+    "bodyParameters": {
+      "parameters": [
+        {
+          "name": "user_name",
+          "value": "={{ $('setar_user').item.json.nome }}"
+        },
+        {
+          "name": "user_phone",
+          "value": "={{ $('setar_user').item.json.telefone }}"
+        },
+        {
+          "name": "user_id",
+          "value": "={{ $('setar_user').item.json.id_user }}"
+        },
+        {
+          "name": "messageType",
+          "value": "={{ $('trigger-whatsapp').item.json.messages[0].type === 'button' ? 'text' : $('trigger-whatsapp').item.json.messages[0].type }}"
+        },
+        {
+          "name": "messageId",
+          "value": "={{ $('trigger-whatsapp').item.json.messages[0].id }}"
+        },
+        {
+          "name": "conversation",
+          "value": "={{ $('trigger-whatsapp').item.json.messages[0].type === 'interactive' ? $('trigger-whatsapp').item.json.messages[0].interactive.button_reply.id : $('trigger-whatsapp').item.json.messages[0].text?.body }}"
+        },
+        {
+          "name": "base64",
+          "value": "={{ $('trigger-whatsapp').item.json.messages[0].image?.id }}"
+        },
+        {
+          "name": "base64audio",
+          "value": "={{ $('trigger-whatsapp').item.json.messages[0].audio?.id }}"
+        },
+        {
+          "name": "docType",
+          "value": "={{ $('trigger-whatsapp').item.json.messages[0].document?.mime_type }}"
+        },
+        {
+          "name": "base64doc",
+          "value": "={{ $('trigger-whatsapp').item.json.messages[0].document?.id }}"
+        }
+      ]
+    },
+    "options": {}
+  },
+  "type": "n8n-nodes-base.httpRequest",
+  "typeVersion": 4.2,
+  "position": [
+    1520,
+    112
+  ],
+  "id": "d91ee504-f9be-43ec-b8e9-71d58ad05784",
+  "name": "Premium User",
+  "retryOnFail": true,
+  "maxTries": 5,
+  "executeOnce": false,
+  "credentials": {
+    "httpBasicAuth": {
+      "id": "fSx1ApZPcITxgUNE",
+      "name": "Avelum Credential"
+    }
+  },
+  "onError": "continueErrorOutput"
+}
