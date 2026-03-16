@@ -563,6 +563,63 @@ id: 'evt_del_' + String($('HTTP - Create Calendar Tool2').item.json.evento_id_cr
 
 **Não precisa criar nada novo — o ID já trafega no workflow, só precisa colocar ele no JSON do botão.**
 
+---
+
+## PROBLEMA DESCOBERTO: O ID NÃO CHEGA NO FIX CONFLITO v2
+
+### O que acontece:
+O webhook `Calendar-Creator` tem `responseMode: lastNode`. O último node é `Create a row1` (log na tabela `log_total`), que retorna dados do LOG — não o `evento_id_criado`.
+
+O `evento_id_criado` existe no node `sucesso_google`/`sucesso_padrao`, mas se perde porque o log roda depois.
+
+### A correção (no workflow Calendar WebHooks):
+
+**Adicionar 1 Set node no final de cada caminho** que retorna o ID do evento.
+
+#### Caminho Google (após `Create a row1`):
+Adicionar um **Set node** chamado `Resposta com ID`:
+```
+evento_id_criado = {{ $('sucesso_google').item.json.evento_id_criado }}
+sucesso = true
+```
+
+#### Caminho Padrão (após `Create a row`):
+Adicionar um **Set node** chamado `Resposta com ID (padrao)`:
+```
+evento_id_criado = {{ $('sucesso_padrao').item.json.evento_id_criado }}
+sucesso = true
+```
+
+**Resultado:** O último node agora retorna `{ evento_id_criado: 12345, sucesso: true }`, que é a resposta HTTP que chega no `HTTP - Create Calendar Tool2` do Fix Conflito v2.
+
+### Fluxo corrigido:
+```
+ANTES:
+  sucesso_google → Create a row1 → FIM (retorna dados do log ❌)
+
+DEPOIS:
+  sucesso_google → Create a row1 → Resposta com ID → FIM (retorna ID ✅)
+```
+
+### Passo a passo no n8n:
+
+1. Abrir workflow **Calendar WebHooks**
+2. Após o node `Create a row1`, adicionar um **Set node**:
+   - Nome: `Resposta com ID`
+   - Campo: `evento_id_criado` = `{{ $('sucesso_google').item.json.evento_id_criado }}`
+   - Campo: `sucesso` = `true`
+3. Conectar `Create a row1` → `Resposta com ID`
+4. Repetir para o caminho `Create a row` → `Resposta com ID (padrao)`:
+   - Campo: `evento_id_criado` = `{{ $('sucesso_padrao').item.json.evento_id_criado }}`
+   - Campo: `sucesso` = `true`
+5. Salvar
+
+### Depois, no Fix Conflito v2:
+O botão agora funciona:
+```javascript
+id: 'evt_del_' + String($('HTTP - Create Calendar Tool2').item.json.evento_id_criado || '')
+```
+
 ### Para financeiro — mesma lógica:
 
 Hoje o template roda ANTES do registro no banco. Invertendo a ordem (primeiro `HTTP - Create Tool1`, depois enviar mensagem), o ID fica em:
