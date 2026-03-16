@@ -1,0 +1,1 @@
+={{ { messaging_product: 'whatsapp', to: $('premium').item.json.body.user_phone, type: 'text', text: { body: 'Sem problemas! Seus eventos continuam salvos aqui normalmente. Se mudar de ideia, é só me dizer \"conectar google\".' } } }}
