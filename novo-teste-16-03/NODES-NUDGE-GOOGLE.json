@@ -1,0 +1,429 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "profiles",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "={{ $('setar_user').item.json.id_user }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -4800,
+        1840
+      ],
+      "id": "nudge-001",
+      "name": "Checar Google Connect",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "kQkN5PrZm2GihQfS",
+          "name": "Total Supabase"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "nudge-if-gc",
+              "leftValue": "={{ $json.google_connect_status }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -4560,
+        1840
+      ],
+      "id": "nudge-002",
+      "name": "Google Desconectado?"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "gc_nudge",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "user_id",
+              "keyValue": "={{ $('setar_user').item.json.id_user }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -4320,
+        1760
+      ],
+      "id": "nudge-003",
+      "name": "Buscar Nudge",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "kQkN5PrZm2GihQfS",
+          "name": "Total Supabase"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "nudge-pode-enviar",
+              "leftValue": "={{ (() => { const n = $json; if (!n || !n.user_id) return true; if (n.opted_out) return false; const now = Date.now(); if (n.last_sent_at && (now - new Date(n.last_sent_at).getTime()) < 3 * 86400000) return false; if (n.last_response === 'nao' && n.last_response_at && (now - new Date(n.last_response_at).getTime()) < 7 * 86400000) return false; return true; })() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -4080,
+        1760
+      ],
+      "id": "nudge-004",
+      "name": "Pode Enviar Nudge?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v23.0/744582292082931/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  messaging_product: 'whatsapp',\n  to: $('Evolution API- Take all').item.json.phone,\n  type: 'interactive',\n  interactive: {\n    type: 'button',\n    body: {\n      text: '📅 Vi que seu Google Calendar não está conectado.\\n\\nConectando, seus eventos aparecem automaticamente no app do Google Agenda!\\n\\nQuer conectar agora?'\n    },\n    action: {\n      buttons: [\n        {\n          type: 'reply',\n          reply: { id: 'gc_sim', title: '✅ Sim, conectar' }\n        },\n        {\n          type: 'reply',\n          reply: { id: 'gc_nao', title: '❌ Agora não' }\n        }\n      ]\n    }\n  }\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -3840,
+        1680
+      ],
+      "id": "nudge-005",
+      "name": "Enviar Nudge Google",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "TDDrQvr1s0RxXTTC",
+          "name": "WhatsApp Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ldbdtakddxznfridsarn.supabase.co/rest/v1/gc_nudge",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  user_id: $('setar_user').item.json.id_user,\n  last_sent_at: new Date().toISOString()\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -3600,
+        1680
+      ],
+      "id": "nudge-006",
+      "name": "Registrar Nudge Enviado",
+      "credentials": {
+        "supabaseApi": {
+          "id": "kQkN5PrZm2GihQfS",
+          "name": "Total Supabase"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ldbdtakddxznfridsarn.supabase.co/rest/v1/gc_nudge",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  user_id: $('setar_user').item.json.id_user,\n  last_response: 'sim',\n  last_response_at: new Date().toISOString()\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -4320,
+        2160
+      ],
+      "id": "nudge-handler-sim-1",
+      "name": "Registrar Sim",
+      "credentials": {
+        "supabaseApi": {
+          "id": "kQkN5PrZm2GihQfS",
+          "name": "Total Supabase"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v23.0/744582292082931/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  messaging_product: 'whatsapp',\n  to: $('Extrair Botão').item.json.user_phone || $('Evolution API- Take all').item.json.phone,\n  type: 'interactive',\n  interactive: {\n    type: 'cta_url',\n    body: {\n      text: '🎉 Ótimo! É bem simples:\\n\\n1️⃣ Toque no botão abaixo\\n2️⃣ Faça login com sua conta Google\\n3️⃣ Autorize o acesso ao calendário\\n4️⃣ Pronto!\\n\\nDepois de conectar, tudo que criar aqui aparece no Google Agenda automaticamente.'\n    },\n    action: {\n      name: 'cta_url',\n      parameters: {\n        display_text: '🔗 Conectar meu Google',\n        url: 'https://totalassistente.com.br/agenda'\n      }\n    }\n  }\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -4080,
+        2160
+      ],
+      "id": "nudge-handler-sim-2",
+      "name": "Enviar Tutorial Google",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "TDDrQvr1s0RxXTTC",
+          "name": "WhatsApp Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://ldbdtakddxznfridsarn.supabase.co/rest/v1/gc_nudge?user_id=eq.{{ $('setar_user').item.json.id_user }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  last_response: 'nao',\n  last_response_at: new Date().toISOString(),\n  total_nao: ($('Buscar Nudge').item.json.total_nao || 0) + 1,\n  opted_out: (($('Buscar Nudge').item.json.total_nao || 0) + 1) >= 2\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -4320,
+        2400
+      ],
+      "id": "nudge-handler-nao-1",
+      "name": "Registrar Não",
+      "credentials": {
+        "supabaseApi": {
+          "id": "kQkN5PrZm2GihQfS",
+          "name": "Total Supabase"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v23.0/744582292082931/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  messaging_product: 'whatsapp',\n  to: $('Extrair Botão').item.json.user_phone || $('Evolution API- Take all').item.json.phone,\n  type: 'text',\n  text: {\n    body: 'Sem problemas! Seus eventos continuam salvos aqui normalmente. Se mudar de ideia, é só me dizer \"conectar google\".'\n  }\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -4080,
+        2400
+      ],
+      "id": "nudge-handler-nao-2",
+      "name": "Responder Não Google",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "TDDrQvr1s0RxXTTC",
+          "name": "WhatsApp Header Auth"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Checar Google Connect": {
+      "main": [
+        [
+          {
+            "node": "Google Desconectado?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Desconectado?": {
+      "main": [
+        [
+          {
+            "node": "Buscar Nudge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Buscar Nudge": {
+      "main": [
+        [
+          {
+            "node": "Pode Enviar Nudge?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pode Enviar Nudge?": {
+      "main": [
+        [
+          {
+            "node": "Enviar Nudge Google",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Enviar Nudge Google": {
+      "main": [
+        [
+          {
+            "node": "Registrar Nudge Enviado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar Sim": {
+      "main": [
+        [
+          {
+            "node": "Enviar Tutorial Google",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar Não": {
+      "main": [
+        [
+          {
+            "node": "Responder Não Google",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
