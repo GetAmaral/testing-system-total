@@ -1,0 +1,458 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// Extrair ação do botão clicado\n// ============================================================\n// Entrada: payload do WhatsApp quando user clica num botão\n// O button_reply.id vem no formato: evt_del_1600, fin_del_123, evt_edit_1600\n// ============================================================\n\nconst item = $input.first().json;\n\n// Tentar extrair o button_reply.id de várias formas\nlet buttonId = '';\n\n// Forma 1: veio direto no conversation (Evolution API pode colocar aqui)\nif (item.conversation && (item.conversation.startsWith('evt_') || item.conversation.startsWith('fin_') || item.conversation.startsWith('rec_'))) {\n  buttonId = item.conversation;\n}\n\n// Forma 2: veio no body.interactive.button_reply.id (payload direto do WhatsApp)\nif (!buttonId && item.interactive?.button_reply?.id) {\n  buttonId = item.interactive.button_reply.id;\n}\n\n// Forma 3: buscar no body original\nif (!buttonId) {\n  const body = item.body || {};\n  if (body.interactive?.button_reply?.id) {\n    buttonId = body.interactive.button_reply.id;\n  }\n  // Tentar messages array\n  if (!buttonId && Array.isArray(body.messages)) {\n    const msg = body.messages[0];\n    if (msg?.interactive?.button_reply?.id) {\n      buttonId = msg.interactive.button_reply.id;\n    }\n  }\n}\n\n// Extrair tipo e ID\nlet acao = 'desconhecido';\nlet entityId = '';\n\nif (buttonId.startsWith('evt_del_')) {\n  acao = 'excluir_evento';\n  entityId = buttonId.replace('evt_del_', '');\n} else if (buttonId.startsWith('evt_edit_')) {\n  acao = 'editar_evento';\n  entityId = buttonId.replace('evt_edit_', '');\n} else if (buttonId.startsWith('fin_del_')) {\n  acao = 'excluir_financeiro';\n  entityId = buttonId.replace('fin_del_', '');\n} else if (buttonId.startsWith('rec_del_')) {\n  acao = 'excluir_recorrente';\n  entityId = buttonId.replace('rec_del_', '');\n}\n\nreturn [{\n  json: {\n    acao,\n    entityId,\n    buttonId,\n    user_id: $('setar_user').item.json.id_user,\n    user_phone: $('premium').item.json.body.user_phone || $('Evolution API- Take all').item.json.phone\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4960,
+        1840
+      ],
+      "id": "btn-code-001",
+      "name": "Extrair Ação do Botão"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.acao }}",
+                    "rightValue": "excluir_evento",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "btn-cond-del-evt"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Excluir Evento"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "btn-cond-del-fin",
+                    "leftValue": "={{ $json.acao }}",
+                    "rightValue": "excluir_financeiro",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Excluir Financeiro"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "btn-cond-edit-evt",
+                    "leftValue": "={{ $json.acao }}",
+                    "rightValue": "editar_evento",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Editar Evento"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "btn-cond-del-rec",
+                    "leftValue": "={{ $json.acao }}",
+                    "rightValue": "excluir_recorrente",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Excluir Recorrente"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -4720,
+        1840
+      ],
+      "id": "btn-switch-001",
+      "name": "Tipo de Ação"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://totalassistente.com.br/webhook/excluir-evento-total",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "event_id",
+              "value": "={{ $json.entityId }}"
+            },
+            {
+              "name": "user_id",
+              "value": "={{ $json.user_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -4400,
+        1600
+      ],
+      "id": "btn-del-evt-001",
+      "name": "Excluir Evento (Botão)",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "fSx1ApZPcITxgUNE",
+          "name": "Avelum Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v23.0/744582292082931/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  messaging_product: 'whatsapp',\n  to: $('Extrair Ação do Botão').item.json.user_phone,\n  type: 'text',\n  text: {\n    body: '🗑️ Evento excluído com sucesso!'\n  }\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -4160,
+        1600
+      ],
+      "id": "btn-resp-evt-001",
+      "name": "Confirmar Exclusão Evento",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "TDDrQvr1s0RxXTTC",
+          "name": "WhatsApp Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://totalassistente.com.br/webhook/excluir-supabase",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "id_gasto",
+              "value": "={{ $json.entityId }}"
+            },
+            {
+              "name": "id_user",
+              "value": "={{ $json.user_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -4400,
+        1840
+      ],
+      "id": "btn-del-fin-001",
+      "name": "Excluir Financeiro (Botão)",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "fSx1ApZPcITxgUNE",
+          "name": "Avelum Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v23.0/744582292082931/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  messaging_product: 'whatsapp',\n  to: $('Extrair Ação do Botão').item.json.user_phone,\n  type: 'text',\n  text: {\n    body: '🗑️ Registro financeiro desfeito!'\n  }\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -4160,
+        1840
+      ],
+      "id": "btn-resp-fin-001",
+      "name": "Confirmar Exclusão Financeiro",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "TDDrQvr1s0RxXTTC",
+          "name": "WhatsApp Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v23.0/744582292082931/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  messaging_product: 'whatsapp',\n  to: $('Extrair Ação do Botão').item.json.user_phone,\n  type: 'interactive',\n  interactive: {\n    type: 'button',\n    body: {\n      text: '✏️ O que deseja alterar nesse evento?'\n    },\n    action: {\n      buttons: [\n        {\n          type: 'reply',\n          reply: {\n            id: 'edit_nome_' + $('Extrair Ação do Botão').item.json.entityId,\n            title: '📝 Nome'\n          }\n        },\n        {\n          type: 'reply',\n          reply: {\n            id: 'edit_data_' + $('Extrair Ação do Botão').item.json.entityId,\n            title: '📅 Data/Hora'\n          }\n        },\n        {\n          type: 'reply',\n          reply: {\n            id: 'edit_ambos_' + $('Extrair Ação do Botão').item.json.entityId,\n            title: '✏️ Ambos'\n          }\n        }\n      ]\n    }\n  }\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -4400,
+        2080
+      ],
+      "id": "btn-edit-evt-001",
+      "name": "Perguntar Edição Evento",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "TDDrQvr1s0RxXTTC",
+          "name": "WhatsApp Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://totalassistente.com.br/webhook/excluir-evento-total",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "event_id",
+              "value": "={{ $json.entityId }}"
+            },
+            {
+              "name": "user_id",
+              "value": "={{ $json.user_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -4400,
+        2320
+      ],
+      "id": "btn-del-rec-001",
+      "name": "Excluir Recorrente (Botão)",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "fSx1ApZPcITxgUNE",
+          "name": "Avelum Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v23.0/744582292082931/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  messaging_product: 'whatsapp',\n  to: $('Extrair Ação do Botão').item.json.user_phone,\n  type: 'text',\n  text: {\n    body: '🗑️ Evento recorrente excluído!'\n  }\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -4160,
+        2320
+      ],
+      "id": "btn-resp-rec-001",
+      "name": "Confirmar Exclusão Recorrente",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "TDDrQvr1s0RxXTTC",
+          "name": "WhatsApp Header Auth"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Extrair Ação do Botão": {
+      "main": [
+        [
+          {
+            "node": "Tipo de Ação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tipo de Ação": {
+      "main": [
+        [
+          {
+            "node": "Excluir Evento (Botão)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Excluir Financeiro (Botão)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Perguntar Edição Evento",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Excluir Recorrente (Botão)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Excluir Evento (Botão)": {
+      "main": [
+        [
+          {
+            "node": "Confirmar Exclusão Evento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Excluir Financeiro (Botão)": {
+      "main": [
+        [
+          {
+            "node": "Confirmar Exclusão Financeiro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Excluir Recorrente (Botão)": {
+      "main": [
+        [
+          {
+            "node": "Confirmar Exclusão Recorrente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
