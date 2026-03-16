@@ -496,3 +496,82 @@ Depende de como o webhook processa. Em alguns setups, o button reply vem em:
 - `$json.conversation`
 
 Testar qual campo traz o ID no seu setup específico (Evolution API ou webhook direto).
+
+---
+
+## COMO O ID CHEGA NO BOTÃO — EXPLICAÇÃO VISUAL
+
+### O fluxo completo, passo a passo:
+
+```
+PASSO 1: User manda "dentista amanhã às 14h"
+
+PASSO 2: n8n cria o evento no Supabase (via webhook Calendar-Creator)
+         O Supabase retorna: { id: 12345, uuid: "abc-123-def", event_name: "Dentista" }
+                               ↑
+                               ESTE é o ID que vai no botão
+
+PASSO 3: O node "sucesso_google" (ou "sucesso_padrao") já pega esse ID:
+         evento_id_criado = $('create_calendar_sup_google').item.json.id
+                                                                    ↑
+                                                          JÁ EXISTE NO WORKFLOW!
+
+PASSO 4: Esse valor volta pro Fix Conflito v2 como resposta do
+         HTTP - Create Calendar Tool2
+
+PASSO 5: Na hora de enviar a mensagem pro WhatsApp,
+         coloca esse ID dentro do botão:
+         botão.id = "evt_del_12345"
+
+PASSO 6: User vê a mensagem com o botão e clica "🗑️ Excluir"
+
+PASSO 7: WhatsApp manda de volta pro webhook: "evt_del_12345"
+
+PASSO 8: n8n recebe, tira o prefixo "evt_del_", fica com "12345"
+
+PASSO 9: DELETE FROM calendar WHERE id = 12345
+         → Pronto, excluído em ~2 segundos!
+```
+
+### Onde o ID já existe no workflow de produção:
+
+O webhook `Webhook-Calendar-Creator` cria o evento e os nodes `sucesso_google` e `sucesso_padrao` já extraem o ID:
+
+```javascript
+// Node "sucesso_google" — JÁ EXISTE:
+evento_id_criado = $('create_calendar_sup_google').item.json.id
+
+// Node "sucesso_padrao" — JÁ EXISTE:
+evento_id_criado = $('create_calendar_sup_google1').item.json.id
+```
+
+Esse `evento_id_criado` volta como resposta HTTP pro `HTTP - Create Calendar Tool2` no workflow principal.
+
+### Como acessar no node do botão:
+
+No `HTTP Request` que envia a confirmação do evento, o ID fica em:
+
+```javascript
+$('HTTP - Create Calendar Tool2').item.json.evento_id_criado
+```
+
+E no JSON do botão:
+
+```javascript
+id: 'evt_del_' + String($('HTTP - Create Calendar Tool2').item.json.evento_id_criado || '')
+```
+
+**Não precisa criar nada novo — o ID já trafega no workflow, só precisa colocar ele no JSON do botão.**
+
+### Para financeiro — mesma lógica:
+
+Hoje o template roda ANTES do registro no banco. Invertendo a ordem (primeiro `HTTP - Create Tool1`, depois enviar mensagem), o ID fica em:
+
+```javascript
+$('HTTP - Create Tool1').item.json.id
+```
+
+E no botão:
+
+```javascript
+id: 'fin_del_' + String($('HTTP - Create Tool1').item.json.id || '')
