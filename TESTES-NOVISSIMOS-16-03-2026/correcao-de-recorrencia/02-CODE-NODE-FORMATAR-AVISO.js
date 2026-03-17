@@ -23,16 +23,23 @@ if (conflitos.length === 1 && conflitos[0].conflito === false) {
   return [{ json: { tem_conflito: false } }];
 }
 
-// Função auxiliar para formatar data ISO → "17/03/2026 10:00"
+// Função auxiliar para formatar data ISO → "17/03/2026 10:00" em horário de Brasília
+// CORREÇÃO: usa UTC-3 (America/Sao_Paulo) em vez de UTC+0
 function formatarData(isoString) {
   if (!isoString) return '(sem data)';
   try {
     const d = new Date(isoString);
-    const dia = String(d.getDate()).padStart(2, '0');
-    const mes = String(d.getMonth() + 1).padStart(2, '0');
-    const ano = d.getFullYear();
-    const hora = String(d.getHours()).padStart(2, '0');
-    const min = String(d.getMinutes()).padStart(2, '0');
+    // Converter para Brasília (UTC-3): subtrai 3 horas do UTC
+    const brasiliaOffset = -3 * 60; // -180 minutos
+    const utcMs = d.getTime() + (d.getTimezoneOffset() * 60000);
+    const brasiliaMs = utcMs + (brasiliaOffset * 60000);
+    const brasilia = new Date(brasiliaMs);
+
+    const dia = String(brasilia.getDate()).padStart(2, '0');
+    const mes = String(brasilia.getMonth() + 1).padStart(2, '0');
+    const ano = brasilia.getFullYear();
+    const hora = String(brasilia.getHours()).padStart(2, '0');
+    const min = String(brasilia.getMinutes()).padStart(2, '0');
     return `${dia}/${mes}/${ano} ${hora}:${min}`;
   } catch (e) {
     return isoString;
