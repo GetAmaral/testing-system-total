@@ -492,7 +492,7 @@ Se a mensagem contém verbos de CORREÇÃO:
 | 11 | TIMEOUT 67s | AI Agent config | `AI Agent` maxTries | 1 min |
 | 12 | Edição cria novo gasto | Classificador | `Escolher Branch` | 5 min |
 
-### Tempo total estimado: ~1h15
+### Tempo total estimado: ~1h45
 
 ### Prioridade de implementação:
 ```
@@ -504,4 +504,216 @@ Se a mensagem contém verbos de CORREÇÃO:
 6. Bug 5 (lembretes) — 2 min, melhora UX
 7. Bugs 7+12 (classificador edição) — 10 min
 8. Bugs 8+9+10 (webhooks busca) — 30 min
+9. Bugs 13+14+15+16+17 (novos) — 25 min
 ```
+
+---
+
+## BUGS ADICIONAIS (encontrados na revisão cruzada)
+
+---
+
+## BUG #13: "O que tenho pra hoje?" não encontra eventos — 1/5
+
+### Evidência:
+```
+P1.13: "o que tenho pra hoje?" → "Não encontrei eventos nesse período" ❌
+P2.13: "minha agenda de amanhã" → Listou corrida ✅
+P3.13: "agenda do dia" → Listou Buscar Encomenda ✅
+P4.13: "meus compromissos de hoje" → Listou 2 eventos ✅
+P5.13: "agenda de hoje" → Listou 3 eventos ✅
+```
+
+### Diagnóstico:
+Aconteceu apenas na P1, logo após criar eventos recorrentes (academia seg/qua/sex). Os eventos existiam mas a busca não encontrou.
+
+**Node:** AI Agent → tool `buscar_eventos`
+
+O AI Agent monta a busca com `data_inicio_evento` e `data_fim_evento`. Na P1, a IA pode ter passado o horário errado (ex: futuro ao invés de dia inteiro) ou a query não cobriu eventos já passados no mesmo dia.
+
+### Causa raiz:
+Inconsistente — funcionou 4/5 vezes. Pode ser:
+1. Timezone: se o AI Agent mandou data em UTC e os eventos estão em -03:00
+2. Range muito estreito: buscou "a partir de agora" ao invés de "dia inteiro"
+3. Eventos recorrentes não expandidos para a data de hoje
+
+### Fix:
+No system prompt do AI Agent, adicionar:
+```
+BUSCA DE AGENDA:
+Quando o usuário pedir "agenda de hoje" ou "o que tenho hoje":
+- data_inicio = "YYYY-MM-DD 00:00:00-03" (início do dia)
+- data_fim = "YYYY-MM-DD 23:59:59-03" (fim do dia)
+Nunca use a hora atual como início — sempre o dia inteiro.
+```
+
+---
+
+## BUG #14: IA conta piada quando deveria recusar — 1/5
+
+### Evidência:
+```
+P2.28: "me conta uma piada" → "Por que o livro foi ao médico?
+        Porque ele tinha muitas páginas em branco! 😂" ❌
+P1.28: "quem é o presidente?" → Recusou ✅
+P3.28: "raiz quadrada de 144?" → Recusou ✅
+P4.28: "habitantes da China?" → Recusou ✅
+P5.28: "quem ganhou copa 2022?" → Recusou ✅
+```
+
+### Diagnóstico:
+**Node:** AI Agent → system prompt
+
+O system prompt diz:
+```
+Seu tom é de secretária profissional...
+pode usar "rs" ou "haha" se fizer sentido
+```
+
+Isso dá margem para a IA interpretar "me conta uma piada" como algo dentro do tom informal permitido. O prompt não diz explicitamente "NÃO conte piadas".
+
+A seção "O QUE VOCÊ NÃO FAZ" lista coisas técnicas (investimentos, email, etc) mas não lista entretenimento/piadas.
+
+### Causa raiz:
+O prompt permite tom informal ("haha", "rs") mas não proíbe explicitamente entretenimento. A IA interpretou que contar uma piada curta faz parte do tom acolhedor.
+
+### Fix:
+Na seção "O QUE VOCÊ NÃO FAZ" do system prompt:
+```
+• NÃO conta piadas, histórias, curiosidades ou qualquer conteúdo de entretenimento
+```
+
+Na seção "COMO RECUSAR COM ELEGÂNCIA":
+```
+- "Piadas não é minha especialidade rs, mas posso te ajudar a organizar sua agenda ou registrar um gasto!"
+```
+
+---
+
+## BUG #15: "Apaga o último que registrei" não encontra — 1/5
+
+### Evidência:
+```
+P5.09: "apaga o último que registrei" → "Não encontrei nenhum registro" ❌
+P1.09: "apaga meu último gasto" → Excluiu Café ✅
+P2.09: "deleta o último lançamento" → Excluiu Bico ✅
+P3.09: "apaga o último registro" → Excluiu Comissão ✅
+P4.09: "remove meu último gasto registrado" → Excluiu Parking ✅
+```
+
+### Diagnóstico:
+**Node:** `excluir2` prompt
+
+O prompt diz:
+```
+REFERÊNCIAS: "último"/"mais recente"=data_gasto mais recente
+```
+
+Na P5, o último registro era "Rodízio" que acabou de ser excluído no P5.08. Então o "último" agora seria o anterior — mas a IA pode ter tentado buscar "Rodízio" novamente (que já não existe).
+
+### Causa raiz:
+Após excluir um gasto, o "último" muda. Se a IA mantém em memória (Redis) o nome do último gasto e tenta buscar por ele, não encontra porque já foi excluído.
+
+### Fix:
+No prompt `excluir2`, reforçar:
+```
+"Último gasto" = buscar com data_gasto mais recente (ORDER BY data_gasto DESC LIMIT 1).
+NÃO usar nome do gasto anterior da conversa — sempre buscar no banco.
+```
+
+---
+
+## BUG #16: Rename de evento pergunta ao invés de fazer — 1/5
+
+### Evidência:
+```
+P3.17: "muda banco pra resolver pendências" → "Quer que eu atualize a descrição?" ⚠️
+P1.17: "renomeia dentista pra consulta odonto" → Renomeou ✅
+P2.17: "troca reunião pra alinhamento semanal" → Renomeou ✅
+P4.17: "troca consulta médica pra check-up" → Renomeou ✅
+P5.17: "muda oculista pra oftalmologista" → Renomeou ✅
+```
+
+### Diagnóstico:
+**Node:** `prompt_editar1` (prompt de edição de eventos) + AI Agent system prompt
+
+O system prompt diz:
+```
+NUNCA peça confirmação para CRIAR. Interprete e aja.
+```
+
+Mas não diz o mesmo para EDITAR. A regra de "não pedir confirmação" é só para criação. Em P3.17, a IA ficou em dúvida se "resolver pendências" é nome ou descrição e pediu confirmação.
+
+### Causa raiz:
+Regra de "não pedir confirmação" não cobre edição. Quando ambíguo (nome vs descrição), a IA pergunta.
+
+### Fix:
+No system prompt:
+```
+• NUNCA peça confirmação para CRIAR ou EDITAR. Interprete e aja.
+• "muda X pra Y" = renomear (trocar nome do evento de X para Y)
+• Só pergunte se realmente impossível identificar a intenção
+```
+
+---
+
+## BUG #17: Latência alta em edição/exclusão (20-51s) — sistêmico
+
+### Evidências:
+```
+P1.07: editar categoria    → 45s
+P3.05: editar valor         → 42s
+P3.07: editar categoria    → 27s
+P3.08: excluir gasto       → 27s
+P5.04: buscar por categoria → 51s
+P5.10: excluir múltiplos   → 27s
+```
+
+### Diagnóstico:
+**21 nodes Redis** no workflow Fix Conflito v2, todos usando credencial "Redis account" (antes era "Redis Germany").
+
+O Redis foi reconectado (não dá mais ENOTFOUND), mas a latência sugere que o servidor Redis está longe geograficamente. O nome da credencial anterior era "Redis Germany" — se o server está na Alemanha e o n8n no Brasil, cada chamada Redis adiciona ~200-500ms de latência. Com 21 nodes Redis por execução: 21 x 300ms = ~6 segundos só de Redis.
+
+Para operações de edição/exclusão, o AI Agent faz múltiplas chamadas de tool (buscar + editar), cada uma passando pelos nodes Redis → latência composta.
+
+### Causa raiz:
+Redis geográficamente distante (provavelmente Europa) + 21 nodes Redis por execução + múltiplas chamadas de tool.
+
+### Fix:
+1. **Instalar Redis local** no server (elimina latência de rede):
+```bash
+sudo apt install redis-server -y
+sudo systemctl enable redis-server --now
+```
+Depois apontar credencial para `localhost:6379`.
+
+2. **Ou migrar para Upstash** na região São Paulo:
+   - https://upstash.com → criar Redis → região sa-east-1
+   - Latência: ~5ms ao invés de ~300ms
+
+### Impacto estimado:
+Com Redis local, a latência média de edição cairia de 25-45s para 10-15s.
+
+---
+
+## RESUMO ATUALIZADO — TODOS OS 17 BUGS
+
+| # | Bug | Score | Severidade | Onde |
+|---|-----|-------|-----------|------|
+| 1 | Ação vs declaração (pix/boleto) | 1/5 | 🔴 CRÍTICO | Classificador |
+| 2 | Investimento como gasto | 1/5 | 🔴 CRÍTICO | Classificador |
+| 3 | "Registro registrado" + Cat Outros | 0/5 | 🔴 PERSISTENTE | Prompt registrar_gasto |
+| 4 | "Semana que vem" = relatório | 3/5 | 🟡 MÉDIO | Classificador |
+| 5 | Consultar lembretes só dia atual | 2/5 | 🟡 MÉDIO | AI Agent prompt |
+| 6 | Multi-turno gasto fantasma | 2/5 | 🔴 CRÍTICO | Prompt registrar_gasto |
+| 7 | Confusão gasto vs evento | 3.6/5 | 🟡 MÉDIO | Classificador |
+| 8 | Excluir recorrente falha | 3/5 | 🟡 MÉDIO | Webhook busca |
+| 9 | Excluir após rename falha | 4/5 | 🟡 BAIXO | Webhook edição |
+| 10 | Cancelar lembrete recorrente | 3/5 | 🟡 MÉDIO | Webhook busca |
+| 11 | TIMEOUT 67s | 4/5 | 🟡 MÉDIO | AI Agent maxTries |
+| 12 | Edição cria novo gasto | 4/5 | 🟡 BAIXO | Classificador |
+| 13 | "O que tenho hoje" não encontra | 4/5 | 🟡 BAIXO | AI Agent (timezone/range) |
+| 14 | Conta piada ao invés de recusar | 4/5 | 🟢 BAIXO | AI Agent prompt |
+| 15 | "Apaga último" não encontra | 4/5 | 🟡 BAIXO | Prompt excluir2 |
+| 16 | Rename pergunta ao invés de fazer | 4/5 | 🟢 BAIXO | AI Agent prompt |
+| 17 | Latência alta 20-51s | sistêmico | 🔴 ALTO | Redis distante (21 nodes) |
