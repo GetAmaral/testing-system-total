@@ -1,0 +1,137 @@
+{
+  "name": "Execution Log - Total Assistente",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "execution-log",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-execution-log",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "webhookId": "execution-log"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validar e normalizar payload do log\nconst body = $input.first().json.body || $input.first().json;\n\n// Campos obrigatórios\nif (!body.user_phone) {\n  throw new Error('Campo obrigatório ausente: user_phone');\n}\nif (!body.source_workflow) {\n  throw new Error('Campo obrigatório ausente: source_workflow');\n}\nif (!body.event_type) {\n  throw new Error('Campo obrigatório ausente: event_type');\n}\n\n// Normalizar telefone (remover caracteres especiais)\nconst normalizePhone = (phone) => {\n  if (!phone) return null;\n  return phone.toString().replace(/[^0-9]/g, '');\n};\n\n// Validar event_type\nconst validEventTypes = [\n  'transcription',\n  'audio_summary',\n  'message_routed',\n  'classification',\n  'ai_response',\n  'action_executed',\n  'interaction_complete',\n  'error',\n  'onboarding'\n];\n\nif (!validEventTypes.includes(body.event_type)) {\n  throw new Error(`event_type inválido: ${body.event_type}. Valores aceitos: ${validEventTypes.join(', ')}`);\n}\n\n// Sanitizar JSONs (garantir que são objetos, não strings)\nconst parseIfString = (val) => {\n  if (!val) return null;\n  if (typeof val === 'string') {\n    try { return JSON.parse(val); } catch { return val; }\n  }\n  return val;\n};\n\n// Montar payload normalizado\nconst logEntry = {\n  // Usuário\n  user_id: body.user_id || null,\n  user_phone: normalizePhone(body.user_phone),\n  user_name: body.user_name || null,\n  user_email: body.user_email || null,\n  user_plan: body.user_plan || null,\n\n  // Mensagem\n  user_message: body.user_message || null,\n  message_type: body.message_type || 'text',\n  message_id: body.message_id || null,\n\n  // Transcrição\n  transcription_text: body.transcription_text || null,\n  summary_text: body.summary_text || null,\n\n  // Classificação\n  branch: body.branch || null,\n\n  // IA\n  ai_message: body.ai_message || null,\n  ai_action: body.ai_action || null,\n  ai_tools_called: parseIfString(body.ai_tools_called),\n  ai_full_response: parseIfString(body.ai_full_response),\n\n  // Ação\n  action_type: body.action_type || null,\n  action_input: parseIfString(body.action_input),\n  action_output: parseIfString(body.action_output),\n  action_success: body.action_success != null ? body.action_success : null,\n\n  // Extração\n  extracted_data: parseIfString(body.extracted_data),\n\n  // Contexto\n  source_workflow: body.source_workflow,\n  event_type: body.event_type,\n  routed_to: body.routed_to || null,\n\n  // Metadados\n  execution_id: body.execution_id || null,\n  duration_ms: body.duration_ms || null,\n  error_message: body.error_message || null,\n  metadata: parseIfString(body.metadata) || {},\n\n  // Timestamp\n  message_timestamp: body.message_timestamp || null\n};\n\nreturn { json: logEntry };"
+      },
+      "id": "validar-campos",
+      "name": "Validar e Normalizar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "execution_log",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldName": "user_id", "fieldValue": "={{ $json.user_id }}" },
+            { "fieldName": "user_phone", "fieldValue": "={{ $json.user_phone }}" },
+            { "fieldName": "user_name", "fieldValue": "={{ $json.user_name }}" },
+            { "fieldName": "user_email", "fieldValue": "={{ $json.user_email }}" },
+            { "fieldName": "user_plan", "fieldValue": "={{ $json.user_plan }}" },
+            { "fieldName": "user_message", "fieldValue": "={{ $json.user_message }}" },
+            { "fieldName": "message_type", "fieldValue": "={{ $json.message_type }}" },
+            { "fieldName": "message_id", "fieldValue": "={{ $json.message_id }}" },
+            { "fieldName": "transcription_text", "fieldValue": "={{ $json.transcription_text }}" },
+            { "fieldName": "summary_text", "fieldValue": "={{ $json.summary_text }}" },
+            { "fieldName": "branch", "fieldValue": "={{ $json.branch }}" },
+            { "fieldName": "ai_message", "fieldValue": "={{ $json.ai_message }}" },
+            { "fieldName": "ai_action", "fieldValue": "={{ $json.ai_action }}" },
+            { "fieldName": "ai_tools_called", "fieldValue": "={{ JSON.stringify($json.ai_tools_called) }}" },
+            { "fieldName": "ai_full_response", "fieldValue": "={{ JSON.stringify($json.ai_full_response) }}" },
+            { "fieldName": "action_type", "fieldValue": "={{ $json.action_type }}" },
+            { "fieldName": "action_input", "fieldValue": "={{ JSON.stringify($json.action_input) }}" },
+            { "fieldName": "action_output", "fieldValue": "={{ JSON.stringify($json.action_output) }}" },
+            { "fieldName": "action_success", "fieldValue": "={{ $json.action_success }}" },
+            { "fieldName": "extracted_data", "fieldValue": "={{ JSON.stringify($json.extracted_data) }}" },
+            { "fieldName": "source_workflow", "fieldValue": "={{ $json.source_workflow }}" },
+            { "fieldName": "event_type", "fieldValue": "={{ $json.event_type }}" },
+            { "fieldName": "routed_to", "fieldValue": "={{ $json.routed_to }}" },
+            { "fieldName": "execution_id", "fieldValue": "={{ $json.execution_id }}" },
+            { "fieldName": "duration_ms", "fieldValue": "={{ $json.duration_ms }}" },
+            { "fieldName": "error_message", "fieldValue": "={{ $json.error_message }}" },
+            { "fieldName": "metadata", "fieldValue": "={{ JSON.stringify($json.metadata) }}" },
+            { "fieldName": "message_timestamp", "fieldValue": "={{ $json.message_timestamp }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "insert-supabase",
+      "name": "Salvar execution_log",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [640, 300],
+      "credentials": {
+        "supabaseApi": {
+          "id": "SUBSTITUIR_PELO_ID_CREDENTIAL",
+          "name": "SUBSTITUIR_PELO_NOME_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, id: $json.id, event_type: $input.first().json.event_type }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-ok",
+      "name": "Responder OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [860, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: $json.message || 'Erro ao salvar log' }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "respond-error",
+      "name": "Responder Erro",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [860, 500]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [{ "node": "Validar e Normalizar", "type": "main", "index": 0 }]
+      ]
+    },
+    "Validar e Normalizar": {
+      "main": [
+        [{ "node": "Salvar execution_log", "type": "main", "index": 0 }]
+      ]
+    },
+    "Salvar execution_log": {
+      "main": [
+        [{ "node": "Responder OK", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "logging" },
+    { "name": "auditoria" }
+  ],
+  "pinData": {},
+  "notes": "Workflow centralizado de logging. Recebe POST de todos os workflows e persiste na tabela execution_log do Supabase.\n\nIMPORTANTE:\n- Substituir credencial Supabase pelo ID correto\n- O webhook path será: /webhook/execution-log\n- Este workflow deve estar SEMPRE ativo\n- Não usar 'Continue On Fail' para detectar erros de insert"
+}
