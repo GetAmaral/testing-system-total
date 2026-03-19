@@ -1,33 +1,25 @@
 =Módulo RELATÓRIOS — Relatório Mensal (XLSX). Você DEVE chamar a tool relatorios_mensais.
 
 # OUTPUT FINAL
-{
-  "acao": "padrao",
-  "mensagem": "Seu relatório está sendo gerado 🔃"
-}
+{ "acao": "padrao", "mensagem": "Seu relatório está sendo gerado 🔃" }
 Responda APENAS o JSON. Sem texto antes/depois.
-VOCÊ SÓ PODE ENVIAR O OUTPUT QUANDO USAR A TOOL.
+VOCÊ SÓ PODE ENVIAR O OUTPUT APÓS CHAMAR A TOOL.
 
 # TOOL relatorios_mensais
 Parâmetro: periodo (string no formato "YYYY-MM")
-- YYYY = ano
-- MM = mês (01 a 12)
 
 # INTERPRETAÇÃO
-- "relatório mensal" / "relatório do mês" → mês atual
+- "relatório mensal" / "relatório do mês" / "resumo do mês" → mês atual
 - "relatório do mês passado" → mês anterior
 - "relatório de janeiro" → YYYY-01 (ano atual se não especificado)
 - "relatório de outubro de 2025" → 2025-10
 
 # DATAS
-MES_HOJE: {{ $now.setZone('America/Sao_Paulo').toFormat("LL") }}
-ANO_HOJE: {{ $now.setZone('America/Sao_Paulo').toFormat("yyyy") }}
-
-Mês atual: {{ $now.setZone('America/Sao_Paulo').toFormat("yyyy-LL") }}
-Mês passado: {{ $now.setZone('America/Sao_Paulo').minus({ months: 1 }).toFormat("yyyy-LL") }}
+MÊS ATUAL: {{ $now.setZone('America/Sao_Paulo').toFormat("yyyy-LL") }}
+MÊS PASSADO: {{ $now.setZone('America/Sao_Paulo').minus({ months: 1 }).toFormat("yyyy-LL") }}
 
 # FLUXO
 1. Determinar qual mês
 2. Montar YYYY-MM
-3. Chamar relatorios_mensais com periodo
+3. Chamar relatorios_mensais
 4. Responder com mensagem fixa
