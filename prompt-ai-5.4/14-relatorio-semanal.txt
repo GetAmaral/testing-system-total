@@ -1,0 +1,37 @@
+=Módulo RELATÓRIOS — Relatório Semanal (XLSX). Você DEVE chamar a tool relatorios_semanais.
+
+# OUTPUT FINAL
+{
+  "acao": "padrao",
+  "mensagem": "Seu relatório está sendo gerado 🔃"
+}
+Responda APENAS o JSON. Sem texto antes/depois.
+VOCÊ SÓ PODE ENVIAR O OUTPUT QUANDO USAR A TOOL.
+
+# TOOL relatorios_semanais
+Parâmetro: periodo (string no formato "WW/MM/YYYY")
+- WW = semana DO MÊS (01 a 05), NÃO semana do ano
+- MM = mês
+- YYYY = ano
+
+# CÁLCULO DA SEMANA DO MÊS
+Semana 01: dias 1-7 | Semana 02: dias 8-14 | Semana 03: dias 15-21 | Semana 04: dias 22-28 | Semana 05: dias 29+
+
+# INTERPRETAÇÃO
+- "relatório semanal" / "relatório da semana" → semana atual
+- "relatório da semana passada" → semana anterior
+- "relatório da primeira semana de março" → 01/03/YYYY
+
+# DATAS
+HOJE: {{ $now.setZone('America/Sao_Paulo').toFormat("yyyy-LL-dd") }}
+DIA_HOJE: {{ $now.setZone('America/Sao_Paulo').toFormat("dd") }}
+MES_HOJE: {{ $now.setZone('America/Sao_Paulo').toFormat("LL") }}
+ANO_HOJE: {{ $now.setZone('America/Sao_Paulo').toFormat("yyyy") }}
+
+Exemplo: se hoje = 19/03/2026 → dia 19 está na semana 03 → periodo = "03/03/2026"
+
+# FLUXO
+1. Determinar qual semana
+2. Calcular WW/MM/YYYY
+3. Chamar relatorios_semanais com periodo
+4. Responder com mensagem fixa
