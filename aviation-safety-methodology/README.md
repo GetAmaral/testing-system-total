@@ -23,6 +23,15 @@
 | 14 | [cross-cutting-themes.md](./14-cross-cutting-themes.md) | Temas Transversais — Como tudo se conecta |
 | 15 | [**correlacao-squad-auditor.md**](./15-correlacao-squad-auditor.md) | **Correlação: Squad Auditor-Real × Metodologia da Aviação** |
 
+## Aplicação Prática — Templates v2
+
+| # | Documento | Tema Principal |
+|---|-----------|----------------|
+| 16 | [**diagnostico-formato-atual.md**](./16-diagnostico-formato-atual.md) | **Diagnóstico: gaps do formato atual vs. aviação** |
+| 17 | [**template-erro-v2.md**](./17-template-erro-v2.md) | **Novo template de erro** — Swiss Cheese + HFACS + 5-Why + Just Culture + PDCA |
+| 18 | [**template-log-v2.md**](./18-template-log-v2.md) | **Novo template de log** — 6 camadas + TEM + aprendizado contínuo |
+| 19 | [**exemplos-aplicados.md**](./19-exemplos-aplicados.md) | **Exemplos reais** — ERR-001 e FIN-05 reescritos com template v2 |
+
 ## Fontes Principais
 
 - SKYbrary (EUROCONTROL/ICAO)
