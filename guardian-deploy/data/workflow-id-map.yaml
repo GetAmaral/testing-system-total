@@ -1,0 +1,86 @@
+# Mapeamento de Workflow Names para PROD IDs
+# Usado pelo *pre-deploy para gerar checklist com IDs corretos
+# Atualizado: 2026-03-23 (VERIFICADO AO VIVO em ambas as VPS)
+#
+# ATENCAO: Os IDs sao DIFERENTES entre DEV e PROD.
+# Alguns workflows tem NOMES DIFERENTES entre DEV e PROD.
+# Consulte data/environments.yaml para o mapa completo.
+
+version: 2.0.0
+last_updated: "2026-03-23"
+last_verified: "2026-03-23 (ao vivo via API DEV + SSH PROD)"
+
+# Workflows que devem ser ATUALIZADOS no deploy
+update:
+  - name: "Main - Total Assistente"
+    dev_id: "hLwhn94JSHonwHzl"
+    prod_id: "9WDlyel5xRCLAvtH"
+    dev_nodes: null  # verificar via snapshot
+    prod_nodes: 75
+    json_file: "Main - Total Assistente (4).json"
+    critical: true
+    has_whatsapp_trigger: true
+    notes: "Entry point principal. WhatsApp trigger FAKE no DEV deve ser substituido pelo REAL em PROD."
+
+  - name: "Calendar WebHooks - Total Assistente"
+    dev_id: "sSEBeOFFSOapRfu6"
+    prod_id: "ZZbMdcuCKx0fM712"
+    prod_nodes: 88
+    json_file: "Calendar WebHooks - Total Assistente (3).json"
+    critical: false
+    notes: "Sync bidirecional com Google Calendar"
+
+  - name: "Financeiro - Total"
+    dev_id: "NCVLUtTn656ACUGS"
+    prod_id: "eYWjnmvP8LQxY87g"
+    prod_nodes: 74
+    json_file: "Financeiro - Total (3).json"
+    critical: false
+    notes: "CRUD financeiro na tabela spent"
+
+  - name: "Lembretes Total Assistente"
+    dev_id: "b3xKlSunpwvC4Vwh"
+    prod_id: "sjDpjKqtwLk7ycki"
+    prod_nodes: 80
+    json_file: "Lembretes Total Assistente (3).json"
+    critical: false
+    notes: "Sistema de lembretes e notificacoes"
+
+  - name_dev: "Report Unificado - Total Assistente"
+    name_prod: "Report Unificado - Total Assistente"
+    dev_id: "0erjX5QpI9IJEmdi"
+    prod_id: "S2QgrsN6uteyB04E"
+    prod_nodes: 57
+    json_file: "Relatórios Mensais-Semanais (3).json"
+    critical: false
+    notes: "ATENCAO: Nome no JSON file e diferente do nome no N8N. Verificar."
+
+  - name_dev: "Fix Conflito v2 - Workflow Principal com Supabase Nativo"
+    name_prod: "Fix Conflito v2 - Workflow Principal com Supabase Nativo"
+    dev_id: "ImW2P52iyCS0bGbQ"
+    prod_id: "tyJ3YAAtSg1UurFj"
+    prod_nodes: 185
+    json_file: "User Premium - Total (3).json"
+    critical: true
+    notes: "ATENCAO: Em PROD este workflow se chama 'Fix Conflito v2' mas o JSON file e 'User Premium'. E o MAIOR workflow (185 nodes, 347KB)."
+
+  - name: "User Standard - Total"
+    dev_id: null
+    prod_id: "c8gtSmh1BPzZXbJa"
+    prod_nodes: 132
+    json_file: "User Standard - Total (3).json"
+    critical: true
+    notes: "NAO existe como workflow separado no DEV. Deployar a partir do JSON file."
+
+# Workflows que NAO devem ser tocados
+skip:
+  - name: "Service Message - 24 Hours"
+    prod_id: "GNdoIS2zxGBa4CW0"
+    prod_nodes: 5
+    reason: "Nao esta nos exports do DEV. Manter versao atual de PROD."
+
+  - name: "My workflow"
+    prod_id: "uzbB6BQ3gf0s3tTqEKGsX"
+    prod_nodes: 4
+    active: false
+    reason: "Workflow de teste inativo. Ignorar."

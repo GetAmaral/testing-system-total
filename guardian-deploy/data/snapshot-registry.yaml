@@ -1,0 +1,22 @@
+# Snapshot Registry — Registro de todos os snapshots capturados
+# Gerenciado automaticamente pelo *snapshot
+# Append-only: nunca remover entradas
+
+version: 1.0.0
+snapshots: []
+# Exemplo de entrada:
+# - date: "2026-03-23 14:30 UTC"
+#   label: "pre-v3.1"
+#   path: "data/snapshots/2026-03-23_14-30_pre-v3.1/"
+#   workflow_count: 7
+#   workflows:
+#     - "Main - Total Assistente"
+#     - "Calendar WebHooks - Total Assistente"
+#     - "Financeiro - Total"
+#     - "User Premium - Total"
+#     - "User Standard - Total"
+#     - "Lembretes Total Assistente"
+#     - "Relatorios Mensais-Semanais"
+#   hashes:
+#     main-total-assistente: "abc123..."
+#     calendar-webhooks: "def456..."

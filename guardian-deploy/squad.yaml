@@ -1,0 +1,136 @@
+name: "guardian-deploy"
+version: "1.0.0"
+description: "Squad copiloto de deploy do Total Assistente. Gerencia snapshots versionados de workflows DEV, testa novas features contra specs, e gera checklist GRANULAR (nivel-node) para deploy manual DEV->PROD com validacao pos-deploy. Resolve a maior dor do processo: esquecer de trocar URLs, credentials, nodes fake e pinData durante o deploy manual."
+author: "AIOS-Total"
+license: MIT
+slashPrefix: guardian
+
+aios:
+  minVersion: "2.1.0"
+  type: squad
+
+components:
+  agents:
+    - agents/guardian.md
+  tasks:
+    # DIFF-CHECK (DEV old -> DEV new)
+    - tasks/snapshot-dev.md
+    - tasks/diff-versions.md
+    # SPEC-AUDITOR (testar novas features)
+    - tasks/create-spec.md
+    - tasks/audit-spec.md
+    # PRE-DEPLOY HELPER (DEV -> PROD)
+    - tasks/generate-deploy-checklist.md
+    - tasks/validate-post-deploy.md
+  workflows:
+    - workflows/full-lifecycle.yaml
+    - workflows/diff-check.yaml
+    - workflows/spec-audit.yaml
+    - workflows/pre-deploy.yaml
+  checklists:
+    - checklists/guardrails-checklist.md
+    - checklists/deploy-rules-checklist.md
+  templates:
+    - templates/snapshot-manifest-tmpl.md
+    - templates/diff-report-tmpl.md
+    - templates/spec-tmpl.md
+    - templates/spec-audit-report-tmpl.md
+    - templates/deploy-checklist-tmpl.md
+    - templates/post-deploy-report-tmpl.md
+  tools: []
+  scripts: []
+
+config:
+  extends: none
+
+dependencies:
+  node: []
+  python: []
+  squads:
+    - testador-n8n        # Simulacao WhatsApp, teste webhook, validacao DEV
+    - deploy-review       # Diff DEV vs PROD, changelog, quality gates
+    - auditor-360         # Teste feature-level (28 features, 7 categorias)
+    - analisador-n8n      # Acesso SSH read-only PROD para validacao pos-deploy
+
+requires:
+  n8n_dev:
+    url: "http://76.13.172.17:5678"
+    api_url: "http://76.13.172.17:5678/api/v1"
+    api_key_env: "N8N_DEV_API_KEY"
+    version: "2.11.2"
+    policy: "read-only"
+    scope: "DEV - somente leitura para snapshots e validacao"
+    allowed_operations:
+      - "GET /api/v1/workflows (listar workflows)"
+      - "GET /api/v1/workflows/{id} (ver workflow)"
+      - "GET /api/v1/executions (ver historico)"
+    blocked_operations:
+      - "PUT /api/v1/workflows/* (modificar)"
+      - "POST /api/v1/workflows/* (criar)"
+      - "DELETE /api/v1/workflows/* (deletar)"
+      - "POST /webhook/* (disparar webhooks)"
+  deploy_docs:
+    path: "/home/totalAssistente/DEPLOY_N8N_WORKFLOWS.md"
+    description: "Documento de referencia para regras de deploy manual"
+  prod_jsons:
+    path: "/home/totalAssistente/jsonsProd/"
+    description: "JSONs de producao exportados para comparacao DEV vs PROD"
+  ssh_prod:
+    host: "188.245.190.178"
+    user: "root"
+    key: "~/.ssh/totalassistente"
+    policy: "read-only"
+    scope: "Somente validacao pos-deploy via @analisador"
+    inherited_from: "analisador-n8n"
+
+guardrails:
+  mode: "dev-read-prod-readonly"
+  severity: "BLOCK"
+  description: |
+    Guardian opera em modo de LEITURA no DEV (snapshots via GET API).
+    PROD e acessado SOMENTE via @analisador (read-only SSH) para validacao pos-deploy.
+    Todo output vai para squads/guardian-deploy/output/ e data/snapshots/.
+    NUNCA executa deploy automatico — gera checklist para o HUMANO executar.
+    NUNCA modifica workflows, credentials ou dados em nenhum ambiente.
+  allowed_writes:
+    - "squads/guardian-deploy/output/**/*.md"
+    - "squads/guardian-deploy/output/**/*.txt"
+    - "squads/guardian-deploy/output/**/*.json"
+    - "squads/guardian-deploy/data/snapshots/**/*.json"
+    - "squads/guardian-deploy/data/snapshot-registry.yaml"
+  blocked_actions:
+    - "PUT/POST/DELETE em qualquer N8N API (DEV ou PROD)"
+    - "SSH write commands em producao"
+    - "Executar deploy automaticamente"
+    - "Modificar workflows DEV ou PROD"
+    - "Enviar mensagens WhatsApp"
+    - "Modificar dados em Supabase"
+    - "docker stop/restart/rm"
+    - "git push/commit"
+    - "npm install/uninstall"
+  rules:
+    - "NUNCA executar deploy — apenas gerar checklist para o humano"
+    - "NUNCA modificar workflows em nenhum ambiente"
+    - "SEMPRE usar GET para acessar N8N DEV API"
+    - "SEMPRE delegar acesso PROD ao @analisador"
+    - "SEMPRE gerar output em squads/guardian-deploy/output/"
+    - "SEMPRE registrar snapshots em data/snapshot-registry.yaml"
+    - "CHECKLIST deve ser GRANULAR ao nivel de NODE — cada correcao com valor exato DE/PARA"
+
+output:
+  directory: "squads/guardian-deploy/output"
+  format: "markdown"
+  naming: "{date}-{type}-{label}.md"
+
+tags:
+  - deploy
+  - lifecycle
+  - snapshot
+  - diff
+  - spec-audit
+  - checklist
+  - validation
+  - post-deploy
+  - total-assistente
+  - n8n
+  - read-only

@@ -1,0 +1,334 @@
+# MAPA COMPLETO: DEV vs PROD
+# Este arquivo é a FONTE DA VERDADE sobre os dois ambientes.
+# NUNCA confundir um com o outro. Na dúvida, consulte este arquivo.
+# Atualizado: 2026-03-23 (verificado ao vivo)
+
+version: 1.0.0
+last_verified: "2026-03-23"
+
+# ╔══════════════════════════════════════════════════════════════════╗
+# ║  DEV — Ambiente de Desenvolvimento                              ║
+# ║  PODE: Ler, testar, simular                                     ║
+# ║  NÃO PODE: Dados reais de usuários                              ║
+# ╚══════════════════════════════════════════════════════════════════╝
+
+dev:
+  label: "DEV — Desenvolvimento"
+  color: "🟢 VERDE"
+
+  vps:
+    ip: "76.13.172.17"
+    hostname: "unknown (sem SSH direto)"
+    provider: "unknown"
+    ssh_access: false
+    notes: "NÃO temos SSH para esta VPS. Acesso SOMENTE via API HTTP."
+
+  n8n:
+    url: "http://76.13.172.17:5678"
+    api_url: "http://76.13.172.17:5678/api/v1"
+    webhook_url: "http://76.13.172.17:5678/webhook/dev-whatsapp"
+    version: "2.11.2"
+    api_key_env: "N8N_DEV_API_KEY"
+    editor_url: "http://76.13.172.17:5678"
+    protocol: http
+    mode: "Self Hosted"
+    workflows:
+      - name: "Main - Total Assistente"
+        id: "hLwhn94JSHonwHzl"
+        active: true
+      - name: "Fix Conflito v2 - Workflow Principal com Supabase Nativo"
+        id: "ImW2P52iyCS0bGbQ"
+        active: true
+      - name: "Financeiro - Total"
+        id: "NCVLUtTn656ACUGS"
+        active: true
+      - name: "Calendar WebHooks - Total Assistente"
+        id: "sSEBeOFFSOapRfu6"
+        active: true
+      - name: "Lembretes Total Assistente"
+        id: "b3xKlSunpwvC4Vwh"
+        active: true
+      - name: "Report Unificado - Total Assistente"
+        id: "0erjX5QpI9IJEmdi"
+        active: true
+    total_workflows: 6
+
+  supabase:
+    ai_messages:
+      label: "AI Messages (DEV)"
+      ref: "hkzgttizcfklxfafkzfl"
+      url: "https://hkzgttizcfklxfafkzfl.supabase.co"
+      key_env: "SUPABASE_AI_MESSAGES_SERVICE_KEY"
+    principal:
+      label: "Principal (PROD — acesso READ-ONLY via service_role)"
+      ref: "ldbdtakddxznfridsarn"
+      url: "https://ldbdtakddxznfridsarn.supabase.co"
+      key_env: "SUPABASE_PRINCIPAL_SERVICE_KEY"
+      access: "READ-ONLY"
+
+  urls_que_identificam_dev:
+    - "76.13.172.17"
+    - "76.13.172.17:5678"
+    - "sslip.io"
+    - "n8n-fcwk0sw4soscgsgs08g8gssk.76.13.172.17.sslip.io"
+    - "n8n-zcgwwscwc8coos88c0g08sks.76.13.172.17.sslip.io"
+
+  local_jsons:
+    path: "/home/AIOS-Total/totalAssistente/jsons/"
+    description: "JSONs exportados do DEV (fallback se API indisponível)"
+
+  whatsapp_trigger:
+    type: "FAKE — webhook + code nodes simulam mensagens"
+    nodes_fake:
+      - "trigger-whatsappsdadsa"
+      - "Normalize WhatsApp payload"
+      - "trigger-whatsapp (code node)"
+
+  test_user:
+    name: "Luiz Felipe"
+    phone: "554391936205"
+    user_id: "2eb4065b-280c-4a50-8b54-4f9329bda0ff"
+    email: "animadoluiz@gmail.com"
+
+# ╔══════════════════════════════════════════════════════════════════╗
+# ║  PROD — Ambiente de Produção                                    ║
+# ║  PODE: Ler (SSH read-only via @analisador)                      ║
+# ║  NÃO PODE: Modificar NADA. JAMAIS.                              ║
+# ╚══════════════════════════════════════════════════════════════════╝
+
+prod:
+  label: "PROD — Produção (USUARIOS REAIS)"
+  color: "🔴 VERMELHO"
+
+  vps:
+    ip: "188.245.190.178"
+    hostname: "total-assistente-02"
+    provider: "Hetzner"
+    os: "Ubuntu 24.04.3 LTS"
+    disk: "75GB (42GB livres)"
+    ram: "7.6GB"
+    ssh_access: true
+    ssh_command: "ssh -i ~/.ssh/totalassistente root@188.245.190.178"
+    ssh_policy: "READ-ONLY — somente via @analisador"
+
+  n8n:
+    url: "https://n8n.totalassistente.com.br"
+    internal_url: "127.0.0.1:5678"
+    webhook_url: "https://totalassistente.com.br/webhook/"
+    version: "2.4.4"
+    protocol: https
+    mode: "Queue (com worker + webhook separados)"
+    editor_url: "https://n8n.totalassistente.com.br"
+    containers:
+      - name: "totalassistente-n8n"
+        role: "N8N main — editor + engine"
+        image: "n8nio/n8n:2.4.4"
+        status: "Up 4 weeks (healthy)"
+      - name: "totalassistente-n8n-worker"
+        role: "N8N worker — processa fila (concurrency=20)"
+        image: "n8nio/n8n:2.4.4"
+        status: "Up 4 weeks"
+      - name: "totalassistente-n8n-webhook"
+        role: "N8N webhook — recebe triggers externos"
+        image: "n8nio/n8n:2.4.4"
+        status: "Up 4 weeks (healthy)"
+    other_containers:
+      - name: "totalassistente-postgres"
+        role: "PostgreSQL — banco principal"
+        image: "postgres:18.1-alpine"
+        status: "Up 7 weeks (healthy)"
+      - name: "totalassistente-redis"
+        role: "Redis — cache e fila"
+        image: "redis:8.4-alpine"
+        status: "Up 7 weeks (healthy)"
+      - name: "totalassistente-rabbitmq"
+        role: "RabbitMQ — message broker para queue mode"
+        image: "rabbitmq:4-management-alpine"
+        status: "Up 7 weeks (healthy)"
+      - name: "totalassistente-site"
+        role: "Nginx — React SPA + SSL + proxy reverso"
+        image: "totalassistente-site (custom)"
+        status: "Up 2 weeks (healthy)"
+      - name: "totalassistente-gotenberg"
+        role: "Gotenberg — gerador de PDF"
+        image: "gotenberg/gotenberg:8"
+        status: "Up 7 weeks (healthy)"
+    total_containers: 8
+    workflows:
+      - name: "Main - Total Assistente"
+        id: "9WDlyel5xRCLAvtH"
+        active: true
+        nodes: 75
+      - name: "Fix Conflito v2 - Workflow Principal com Supabase Nativo"
+        id: "tyJ3YAAtSg1UurFj"
+        active: true
+        nodes: 185
+        notes: "Em PROD, este é o 'User Premium - Total'"
+      - name: "Calendar WebHooks - Total Assistente"
+        id: "ZZbMdcuCKx0fM712"
+        active: true
+        nodes: 88
+      - name: "Financeiro - Total"
+        id: "eYWjnmvP8LQxY87g"
+        active: true
+        nodes: 74
+      - name: "Lembretes Total Assistente"
+        id: "sjDpjKqtwLk7ycki"
+        active: true
+        nodes: 80
+      - name: "Report Unificado - Total Assistente"
+        id: "S2QgrsN6uteyB04E"
+        active: true
+        nodes: 57
+        notes: "Em PROD, este é o 'Relatórios Mensais-Semanais'"
+      - name: "User Standard - Total"
+        id: "c8gtSmh1BPzZXbJa"
+        active: true
+        nodes: 132
+      - name: "Service Message - 24 Hours"
+        id: "GNdoIS2zxGBa4CW0"
+        active: true
+        nodes: 5
+        notes: "NÃO TOCAR — manter versão atual"
+      - name: "My workflow"
+        id: "uzbB6BQ3gf0s3tTqEKGsX"
+        active: false
+        nodes: 4
+        notes: "Workflow de teste — inativo"
+    total_workflows: 9
+
+  supabase:
+    principal:
+      label: "Principal (PROD)"
+      ref: "ldbdtakddxznfridsarn"
+      url: "https://ldbdtakddxznfridsarn.supabase.co"
+      key_env: "SUPABASE_SERVICE_ROLE_KEY"
+
+  urls_que_identificam_prod:
+    - "188.245.190.178"
+    - "totalassistente.com.br"
+    - "n8n.totalassistente.com.br"
+    - "https://totalassistente.com.br"
+
+  local_jsons:
+    path: "/home/totalAssistente/jsonsProd/"
+    description: "JSONs exportados de PROD (8 arquivos, atualizados 2026-01-30)"
+
+  whatsapp_trigger:
+    type: "REAL — n8n-nodes-base.whatsAppTrigger com OAuth"
+    credential: "WhatsApp OAuth account"
+    credential_id: "LBPenwzFCkBeUYSp"
+
+  domain: "totalassistente.com.br"
+  ssl: true
+
+# ╔══════════════════════════════════════════════════════════════════╗
+# ║  TABELA COMPARATIVA — DIFERENÇAS CRÍTICAS                       ║
+# ╚══════════════════════════════════════════════════════════════════╝
+
+comparison:
+  - aspect: "IP"
+    dev: "76.13.172.17"
+    prod: "188.245.190.178"
+    confusao_possivel: "SIM — ambos são IPs numéricos"
+
+  - aspect: "Porta N8N"
+    dev: ":5678 (exposta diretamente)"
+    prod: ":5678 (interna, acessível via Nginx HTTPS)"
+    confusao_possivel: "SIM — mesma porta"
+
+  - aspect: "Protocolo"
+    dev: "HTTP"
+    prod: "HTTPS"
+    confusao_possivel: "NÃO — HTTP vs HTTPS"
+
+  - aspect: "Domínio"
+    dev: "Sem domínio (acesso por IP)"
+    prod: "totalassistente.com.br / n8n.totalassistente.com.br"
+    confusao_possivel: "NÃO"
+
+  - aspect: "N8N Version"
+    dev: "2.11.2"
+    prod: "2.4.4"
+    confusao_possivel: "SIM — DEV está mais novo"
+
+  - aspect: "SSH"
+    dev: "NÃO temos SSH"
+    prod: "SIM — via ~/.ssh/totalassistente"
+    confusao_possivel: "NÃO"
+
+  - aspect: "Modo N8N"
+    dev: "Self Hosted (single instance)"
+    prod: "Queue (main + worker + webhook)"
+    confusao_possivel: "NÃO"
+
+  - aspect: "WhatsApp Trigger"
+    dev: "FAKE (webhook + code nodes)"
+    prod: "REAL (whatsAppTrigger + OAuth)"
+    confusao_possivel: "SIM — CRÍTICO durante deploy"
+
+  - aspect: "Credential Supabase"
+    dev: "fGwpKYpERyVmR2tt"
+    prod: "1ENA7UIm6ILehilJ"
+    confusao_possivel: "SIM — CRÍTICO durante deploy"
+
+  - aspect: "Workflows"
+    dev: "6 workflows"
+    prod: "9 workflows (8 ativos + 1 inativo)"
+    confusao_possivel: "SIM — PROD tem mais"
+
+  - aspect: "Workflow IDs"
+    dev: "IDs diferentes de PROD"
+    prod: "IDs diferentes de DEV"
+    confusao_possivel: "SIM — MESMO workflow tem ID diferente em cada ambiente"
+
+  - aspect: "Usuários"
+    dev: "Luiz Felipe (teste)"
+    prod: "USUÁRIOS REAIS — NUNCA testar aqui"
+    confusao_possivel: "NÃO"
+
+# ╔══════════════════════════════════════════════════════════════════╗
+# ║  MAPEAMENTO DE WORKFLOW IDs: DEV ↔ PROD                         ║
+# ╚══════════════════════════════════════════════════════════════════╝
+
+workflow_id_mapping:
+  - name: "Main - Total Assistente"
+    dev_id: "hLwhn94JSHonwHzl"
+    prod_id: "9WDlyel5xRCLAvtH"
+
+  - name: "Fix Conflito v2 / User Premium - Total"
+    dev_id: "ImW2P52iyCS0bGbQ"
+    prod_id: "tyJ3YAAtSg1UurFj"
+    notes: "Nomes diferentes em DEV e PROD"
+
+  - name: "Financeiro - Total"
+    dev_id: "NCVLUtTn656ACUGS"
+    prod_id: "eYWjnmvP8LQxY87g"
+
+  - name: "Calendar WebHooks - Total Assistente"
+    dev_id: "sSEBeOFFSOapRfu6"
+    prod_id: "ZZbMdcuCKx0fM712"
+
+  - name: "Lembretes Total Assistente"
+    dev_id: "b3xKlSunpwvC4Vwh"
+    prod_id: "sjDpjKqtwLk7ycki"
+
+  - name: "Report Unificado / Relatórios Mensais-Semanais"
+    dev_id: "0erjX5QpI9IJEmdi"
+    prod_id: "S2QgrsN6uteyB04E"
+    notes: "Nomes diferentes em DEV e PROD"
+
+  - name: "User Standard - Total"
+    dev_id: null
+    prod_id: "c8gtSmh1BPzZXbJa"
+    notes: "NÃO existe no DEV como workflow separado"
+
+  - name: "Service Message - 24 Hours"
+    dev_id: null
+    prod_id: "GNdoIS2zxGBa4CW0"
+    notes: "NÃO existe no DEV. NÃO TOCAR em PROD."
+
+  - name: "My workflow"
+    dev_id: null
+    prod_id: "uzbB6BQ3gf0s3tTqEKGsX"
+    notes: "Workflow de teste inativo em PROD. Ignorar."

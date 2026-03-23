@@ -1,0 +1,50 @@
+# Diff Check Workflow
+# Apenas snapshot + comparacao de versoes DEV
+#
+# Uso: @guardian *snapshot {label} seguido de *diff
+# Modo: READ-ONLY
+
+name: diff-check
+version: 1.0.0
+description: "Capturar snapshot do DEV e comparar com snapshot anterior para ver o que mudou"
+trigger: manual
+squad: guardian-deploy
+
+agents:
+  - "@guardian"
+
+pre_conditions:
+  - "N8N dev acessivel em http://76.13.172.17:5678"
+  - "Pelo menos 1 snapshot anterior existe (para comparar)"
+
+steps:
+  - step: 1
+    name: "Capturar Snapshot"
+    task: snapshot-dev.md
+    action: '*snapshot {label}'
+    description: "Exportar workflows DEV como JSON versionado"
+    on_fail: HALT
+    on_success: next
+
+  - step: 2
+    name: "Comparar Versoes"
+    task: diff-versions.md
+    action: '*diff --latest'
+    description: "Comparar ultimo snapshot com penultimo"
+    on_fail: HALT
+    on_success: done
+
+post_conditions:
+  - "Snapshot salvo em data/snapshots/"
+  - "Diff report gerado em output/diffs/"
+  - "Mudancas classificadas por tipo e risco"
+
+output:
+  files:
+    - "data/snapshots/{date}_{label}/"
+    - "output/diffs/{date}-diff-*.md"
+
+notes: |
+  Workflow simples para entender o que mudou entre duas versoes do DEV.
+  Se precisar testar as mudancas: use *spec + *audit-spec.
+  Se precisar deployar: use *pre-deploy.

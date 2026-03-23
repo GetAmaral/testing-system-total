@@ -1,0 +1,111 @@
+# Full Lifecycle Workflow
+# Ciclo completo de deploy: snapshot -> diff -> spec -> checklist -> validacao
+#
+# Uso: @guardian *lifecycle
+# Modo: READ-ONLY (nunca executa deploy)
+
+name: full-lifecycle
+version: 1.0.0
+description: "Ciclo completo de lifecycle de deploy: snapshot antes, snapshot depois, diff, spec-audit, checklist granular, e validacao pos-deploy"
+trigger: manual
+squad: guardian-deploy
+
+agents:
+  - "@guardian"
+
+pre_conditions:
+  - "N8N dev acessivel em http://76.13.172.17:5678"
+  - "JSONs de producao disponiveis em /home/totalAssistente/jsonsProd/"
+  - "SSH key para @analisador configurada (~/.ssh/totalassistente)"
+
+steps:
+  - step: 1
+    name: "Snapshot Pre-Mudanca"
+    task: snapshot-dev.md
+    action: '*snapshot pre-mudanca'
+    description: "Capturar estado atual do DEV antes de qualquer mudanca"
+    on_fail: HALT
+    on_success: next
+
+  - step: 2
+    name: "Pausa - Usuario Faz Mudancas"
+    task: null
+    action: manual-pause
+    description: "Aguardar usuario fazer as mudancas nos workflows do N8N DEV. Quando terminar, retomar com *snapshot pos-mudanca"
+    on_fail: null
+    on_success: next
+
+  - step: 3
+    name: "Snapshot Pos-Mudanca"
+    task: snapshot-dev.md
+    action: '*snapshot pos-mudanca'
+    description: "Capturar estado do DEV apos mudancas"
+    on_fail: HALT
+    on_success: next
+
+  - step: 4
+    name: "Diff de Versoes"
+    task: diff-versions.md
+    action: '*diff --latest'
+    description: "Comparar pre-mudanca vs pos-mudanca para ver o que mudou"
+    on_fail: continue
+    on_success: next
+
+  - step: 5
+    name: "Criar Spec de Mudanca"
+    task: create-spec.md
+    action: '*spec --from-diff latest'
+    description: "Documentar O QUE mudou e POR QUE. Interativo — pergunta ao usuario."
+    on_fail: continue
+    on_success: next
+
+  - step: 6
+    name: "Auditar Contra Spec"
+    task: audit-spec.md
+    action: '*audit-spec --auto'
+    description: "Testar features contra a spec. Delega para @testador e @auditor-360."
+    on_fail: continue
+    on_success: next
+
+  - step: 7
+    name: "Gerar Checklist de Deploy"
+    task: generate-deploy-checklist.md
+    action: '*pre-deploy'
+    description: "Scan GRANULAR dos JSONs e gerar checklist nivel-node com TODAS as correcoes"
+    on_fail: HALT
+    on_success: next
+
+  - step: 8
+    name: "Pausa - Usuario Executa Deploy"
+    task: null
+    action: manual-pause
+    description: "Usuario executa deploy manual seguindo o checklist. Quando terminar, retomar com *validate-prod"
+    on_fail: null
+    on_success: next
+
+  - step: 9
+    name: "Validacao Pos-Deploy"
+    task: validate-post-deploy.md
+    action: '*validate-prod'
+    description: "Verificar PROD: containers, logs, URLs de dev residuais, credentials, WhatsApp trigger"
+    on_fail: HALT
+    on_success: done
+
+post_conditions:
+  - "Todos os relatorios salvos em output/"
+  - "Checklist gerado com todas as correcoes nivel-node"
+  - "PROD validado pos-deploy"
+
+output:
+  files:
+    - "output/diffs/{date}-diff-pre-vs-pos.md"
+    - "output/specs/{date}-spec-*.md"
+    - "output/audits/{date}-spec-audit-*.md"
+    - "output/deploys/{date}-deploy-checklist.md"
+    - "output/deploys/{date}-post-deploy-validation.md"
+
+notes: |
+  Este workflow tem 2 pausas manuais:
+  1. Apos snapshot pre-mudanca: usuario faz mudancas no DEV
+  2. Apos checklist: usuario executa deploy seguindo o checklist
+  O workflow nao executa deploy — apenas gera o checklist para o humano.

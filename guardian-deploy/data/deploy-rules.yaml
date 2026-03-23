@@ -1,0 +1,112 @@
+# Deploy Rules — Machine-readable version of DEPLOY_N8N_WORKFLOWS.md
+# Fonte: /home/totalAssistente/DEPLOY_N8N_WORKFLOWS.md
+# Atualizado: 2026-03-23
+
+version: 1.0.0
+source: "/home/totalAssistente/DEPLOY_N8N_WORKFLOWS.md"
+last_updated: "2026-03-23"
+
+url_replacements:
+  - pattern: "http://n8n-fcwk0sw4soscgsgs08g8gssk.76.13.172.17.sslip.io"
+    replacement: "https://totalassistente.com.br"
+    type: exact
+    known_occurrences: "parte das 23 totais"
+  - pattern: "http://n8n-zcgwwscwc8coos88c0g08sks.76.13.172.17.sslip.io"
+    replacement: "https://totalassistente.com.br"
+    type: exact
+    known_occurrences: "parte das 23 totais"
+  - pattern: "76.13.172.17"
+    replacement: "totalassistente.com.br"
+    type: contains
+    note: "Catch-all para qualquer URL com IP do DEV"
+  - pattern: "sslip.io"
+    replacement: null
+    type: contains
+    note: "Dominio dinamico do DEV — nao deve existir em PROD"
+
+affected_workflows_urls:
+  - "Calendar WebHooks - Total Assistente"
+  - "Financeiro - Total"
+  - "Lembretes Total Assistente"
+  - "Main - Total Assistente"
+  - "User Premium - Total"
+
+credential_swaps:
+  - dev_id: "fGwpKYpERyVmR2tt"
+    prod_id: "1ENA7UIm6ILehilJ"
+    name: "Supabase account"
+    affected_workflows:
+      - workflow: "Main - Total Assistente"
+        node_count: 7
+        node_type: "Create a row"
+      - workflow: "User Premium - Total"
+        node_count: 1
+        node_type: "Create a row"
+
+credential_cosmetic:
+  - id: "amNI4dVfk3J8Bz0v"
+    name_dev: "Upstash 1"
+    name_prod: "Redis Germany"
+    action: "Nenhuma (ID e o mesmo, nome e cosmetico)"
+
+whatsapp_trigger:
+  workflow: "Main - Total Assistente"
+  severity: CRITICAL
+  fake_nodes_to_remove:
+    - name: "trigger-whatsappsdadsa"
+      type: "webhook"
+      description: "Webhook fake que simula mensagens"
+    - name: "Normalize WhatsApp payload"
+      type: "code"
+      description: "Code node que normaliza payload fake"
+    - name: "trigger-whatsapp"
+      type: "code"
+      description: "Code node que transforma payload (NAO confundir com trigger real)"
+  real_trigger:
+    name: "trigger-whatsapp"
+    type: "n8n-nodes-base.whatsAppTrigger"
+    credential_name: "WhatsApp OAuth account"
+    credential_id: "LBPenwzFCkBeUYSp"
+    connection_target: "Edit Fields"
+
+workflows_to_skip:
+  - name: "Service Message - 24 Hours"
+    prod_id: "GNdoIS2zxGBa4CW0"
+    reason: "Nao esta nos exports novos. Manter versao atual de producao."
+
+cleanup:
+  - field: "pinData"
+    action: "Limpar (set null ou remover)"
+    reason: "Dados de teste do dev que nao devem ir para prod"
+  - field: "staticData"
+    action: "Limpar se presente"
+    reason: "Dados de sessao que podem causar conflito"
+
+execution_steps:
+  - step: 1
+    command: "cd /home/totalAssistente && git pull origin main"
+    description: "Pull do GitHub"
+  - step: 2
+    command: "cp -r jsons/ /tmp/deploy_n8n/"
+    description: "Copiar JSONs para area de trabalho"
+  - step: 3
+    command: "Aplicar correcoes nos JSONs"
+    description: "URLs, credentials, WhatsApp trigger, pinData"
+  - step: 4
+    command: "PUT /workflows/{id} active: false"
+    description: "Desativar workflows (um por um)"
+  - step: 5
+    command: "PUT /workflows/{id} com JSON corrigido"
+    description: "Importar JSONs corrigidos"
+  - step: 6
+    command: "PUT /workflows/{id} active: true"
+    description: "Reativar workflows"
+  - step: 7
+    command: "docker logs totalassistente-n8n --tail 50"
+    description: "Verificar logs"
+
+rollback:
+  trigger_phrase: "RESTAURAR GOLDEN BACKUP"
+  backup_name: "GOLDEN_BACKUP_20260213"
+  backup_size: "950MB"
+  description: "Restaura banco completo + dados N8N + workflows originais"

@@ -1,0 +1,62 @@
+# Pre-Deploy Workflow
+# Gerar checklist granular + validacao pos-deploy
+#
+# Uso: @guardian *pre-deploy seguido de deploy manual seguido de *validate-prod
+# Modo: READ-ONLY (NUNCA executa deploy)
+
+name: pre-deploy
+version: 1.0.0
+description: "Gerar checklist GRANULAR de deploy (nivel-node) e validar PROD apos deploy manual"
+trigger: manual
+squad: guardian-deploy
+
+agents:
+  - "@guardian"
+
+pre_conditions:
+  - "JSONs de DEV disponiveis (snapshot ou API)"
+  - "JSONs de PROD em /home/totalAssistente/jsonsProd/"
+  - "DEPLOY_N8N_WORKFLOWS.md atualizado"
+  - "SSH key para @analisador configurada"
+
+steps:
+  - step: 1
+    name: "Gerar Checklist Granular"
+    task: generate-deploy-checklist.md
+    action: '*pre-deploy'
+    description: "Scan COMPLETO dos JSONs DEV: URLs, credentials, nodes fake, pinData. Checklist nivel-node."
+    on_fail: HALT
+    on_success: next
+
+  - step: 2
+    name: "Pausa - Usuario Executa Deploy"
+    task: null
+    action: manual-pause
+    description: "Usuario executa deploy manual seguindo o checklist gerado. Marcar cada [ ] conforme executa."
+    on_fail: null
+    on_success: next
+
+  - step: 3
+    name: "Validacao Pos-Deploy"
+    task: validate-post-deploy.md
+    action: '*validate-prod'
+    description: "Exportar workflows de PROD via @analisador e verificar que nada ficou com dados de DEV"
+    on_fail: HALT
+    on_success: done
+
+post_conditions:
+  - "Checklist GRANULAR gerado com todas as correcoes nivel-node"
+  - "PROD validado pos-deploy (containers, logs, URLs, credentials, WhatsApp trigger)"
+  - "Veredicto emitido: ALL_CLEAR / ISSUES_FOUND / CRITICAL_FAILURE"
+
+output:
+  files:
+    - "output/deploys/{date}-deploy-checklist.md"
+    - "output/deploys/{date}-post-deploy-validation.md"
+
+notes: |
+  Este e o workflow mais CRITICO do squad.
+  O checklist gerado no step 1 e GRANULAR: cada URL, cada credential, cada node.
+  O usuario DEVE marcar cada checkbox antes de prosseguir.
+  Apos deploy, o step 3 escaneia PROD para confirmar que nada foi esquecido.
+  Se CRITICAL_FAILURE: executar rollback "RESTAURAR GOLDEN BACKUP".

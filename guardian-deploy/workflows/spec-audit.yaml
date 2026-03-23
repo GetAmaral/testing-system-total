@@ -1,0 +1,50 @@
+# Spec Audit Workflow
+# Criar spec de mudanca e testar features contra criterios
+#
+# Uso: @guardian *spec seguido de *audit-spec
+# Modo: READ-ONLY (testes delegados ao @testador no DEV)
+
+name: spec-audit
+version: 1.0.0
+description: "Criar especificacao de mudanca e auditar features contra criterios de qualidade"
+trigger: manual
+squad: guardian-deploy
+
+agents:
+  - "@guardian"
+
+pre_conditions:
+  - "Mudancas feitas no DEV (idealmente com diff disponivel)"
+  - "N8N dev acessivel para testes delegados ao @testador"
+
+steps:
+  - step: 1
+    name: "Criar Spec de Mudanca"
+    task: create-spec.md
+    action: '*spec'
+    description: "Documentar o que mudou, por que, e criterios de aceite. Interativo."
+    on_fail: HALT
+    on_success: next
+
+  - step: 2
+    name: "Auditar Contra Spec"
+    task: audit-spec.md
+    action: '*audit-spec --auto'
+    description: "Testar features contra a spec. Veredicto: GO / NO-GO / CONDICIONAL."
+    on_fail: continue
+    on_success: done
+
+post_conditions:
+  - "Spec de mudanca documentada em output/specs/"
+  - "Audit report com veredicto (GO/NO-GO/CONDICIONAL) em output/audits/"
+  - "Features impactadas testadas e avaliadas"
+
+output:
+  files:
+    - "output/specs/{date}-spec-*.md"
+    - "output/audits/{date}-spec-audit-*.md"
+
+notes: |
+  Use apos fazer mudancas no DEV para validar que tudo funciona.
+  Se o veredicto for GO: prossiga com *pre-deploy.
+  Se NO-GO: corrija os problemas e re-execute.

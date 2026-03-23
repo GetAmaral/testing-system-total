@@ -1,0 +1,4 @@
+DOMAIN=deploy-lifecycle
+KEYWORDS=deploy,checklist,snapshot,diff,pre-deploy,pos-deploy,validate-prod,lifecycle,guardian
+RULES_FILE=synapse-rules.md
+MERGE_MODE=extend
